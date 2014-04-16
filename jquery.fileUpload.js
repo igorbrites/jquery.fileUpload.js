@@ -3,6 +3,8 @@
 ;
 (function ($, window, document, undefined) {
 
+	jQuery.event.props.push("dataTransfer");
+
 	// undefined is used here as the undefined global variable in ECMAScript 3 is
 	// mutable (ie. it can be changed by someone else). undefined isn't really being
 	// passed in so we can ensure the value of it is truly undefined. In ES5, undefined
@@ -31,6 +33,9 @@
 		this.settings = $.extend({}, defaults, options);
 		this._defaults = defaults;
 		this._name = pluginName;
+		this._dashdash = '--';
+		this._crlf = '\r\n';
+
 		this.init();
 	}
 
@@ -44,42 +49,67 @@
 			// call them like so: this.yourOtherFunction(this.element, this.settings).
 			console.log("xD");
 		},
-		getBuilder: function (filename, filedata, boundary) {
-			var dashdash = '--',
-				crlf = '\r\n',
-				builder = '';
+		
+		getBuilder: function (filename, filedata) {
+			var builder = '',
+				$this = this,
+				boundary = '------multipartformboundary' + (new Date).getTime();
 
-			$.each(this.settings.data, function (i, val) {
-				if (typeof val === 'function') val = val();
-				builder += dashdash;
-				builder += boundary;
-				builder += crlf;
-				builder += 'Content-Disposition: form-data; name="' + i + '"';
-				builder += crlf;
-				builder += crlf;
-				builder += val;
-				builder += crlf;
+			$.each(this.settings.data, function (name, value) {
+				builder += $this.buildRequestParam(name, value, boundary);
 			});
 
-			builder += dashdash;
+			builder += this._dashdash;
 			builder += boundary;
-			builder += crlf;
+			builder += this._crlf;
 			builder += 'Content-Disposition: form-data; name="' + this.settings.paramName + '"';
 			builder += '; filename="' + filename + '"';
-			builder += crlf;
+			builder += this._crlf;
 
 			builder += 'Content-Type: application/octet-stream';
-			builder += crlf;
-			builder += crlf;
+			builder += this._crlf;
+			builder += this._crlf;
 
 			builder += filedata;
-			builder += crlf;
+			builder += this._crlf;
 
-			builder += dashdash;
+			builder += this._dashdash;
 			builder += boundary;
-			builder += dashdash;
-			builder += crlf;
+			builder += this._dashdash;
+			builder += this._crlf;
 			return builder;
+		},
+		buildRequestParam: function(name, value, boundary) {
+			var param = '';
+			switch (typeof value) {
+				case 'object':
+					for (var i in value) {
+						param += this.buildRequestParam(name + '[' + String(i) + ']', value[i], boundary);
+					}
+					break;
+				case 'function':
+					param += this._dashdash;
+					param += boundary;
+					param += this._crlf;
+					param += 'Content-Disposition: form-data; name="' + name + '"';
+					param += this._crlf;
+					param += this._crlf;
+					param += value();
+					param += this._crlf;
+					break;
+				default:
+					param += this._dashdash;
+					param += boundary;
+					param += this._crlf;
+					param += 'Content-Disposition: form-data; name="' + name + '"';
+					param += this._crlf;
+					param += this._crlf;
+					param += value;
+					param += this._crlf;
+					break;
+			}
+
+			return param;
 		}
 	};
 
