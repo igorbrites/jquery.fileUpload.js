@@ -22,6 +22,7 @@
             url: '',
             data: {},
             paramName: 'files',
+	        requestType: 'POST',
             lazyLoad: false,
             inputFile: null,
             maxFiles: 25,           // Ignored if queueFiles is set > 0
@@ -331,18 +332,20 @@
             var send = function (workQueue) {
 	            var formData = workQueue.shift(),
 		            xhr = new XMLHttpRequest(),
-		            upload = xhr.upload;
+		            upload = xhr.upload,
+		            startTime = new Date().getTime();
+
+	            if (!formData) {
+		            return false;
+	            }
 
                 if (settings.withCredentials) {
                     xhr.withCredentials = settings.withCredentials;
                 }
 
-                upload.index = index;
-                upload.file = file;
-                upload.downloadStartTime = start_time;
-                upload.currentStart = start_time;
+                upload.downloadStartTime = startTime;
+                upload.currentStart = startTime;
                 upload.currentProgress = 0;
-                upload.global_progress_index = global_progress_index;
                 upload.startData = 0;
                 upload.addEventListener("progress", $this.progress, false);
 
@@ -360,7 +363,7 @@
                     xhr.setRequestHeader(k, v);
                 });
 
-                settings.uploadStarted(index, file, files_count);
+                $this.uploadStarted();
 
                 xhr.onload = function () {
                     var serverResponse = null;
@@ -375,7 +378,7 @@
                     }
 
                     var now = new Date().getTime(),
-                        timeDiff = now - start_time,
+                        timeDiff = now - startTime,
                         result = settings.uploadFinished(index, file, serverResponse, timeDiff, xhr);
                     filesDone++;
 
@@ -554,8 +557,12 @@
         }
     };
 
-    // A really lightweight plugin wrapper around the constructor,
-    // preventing against multiple instantiations
+	/**
+	 *
+	 * @param {Object|String} options
+	 * @param {Object} [params]
+	 * @returns {jQuery}
+	 */
     $.fn.fileUpload = function (options, params) {
         this.each(function () {
             if (!$.data(this, 'plugin_' + pluginName)) {
