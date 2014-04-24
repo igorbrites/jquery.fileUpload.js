@@ -1,20 +1,10 @@
 // the semi-colon before function invocation is a safety net against concatenated
 // scripts and/or other plugins which may not be closed properly.
-
+;
 (function ($, window, document, undefined) {
     'use strict';
-    jQuery.event.props.push("dataTransfer");
+    $.event.props.push("dataTransfer");
 
-    // undefined is used here as the undefined global variable in ECMAScript 3 is
-    // mutable (ie. it can be changed by someone else). undefined isn't really being
-    // passed in so we can ensure the value of it is truly undefined. In ES5, undefined
-    // can no longer be modified.
-
-    // window and document are passed through as local variable rather than global
-    // as this (slightly) quickens the resolution process and can be more efficiently
-    // minified (especially when both are regularly referenced in your plugin).
-
-    // Create the defaults once
     var pluginName = "fileUpload",
         $this = null,
         global_progress = [],
@@ -23,6 +13,7 @@
             data: {},
             paramName: 'files',
 	        requestType: 'POST',
+	        withCredentials: false,
             lazyLoad: false,
             inputFile: null,
             maxFiles: 25,           // Ignored if queueFiles is set > 0
@@ -51,31 +42,162 @@
             allowedFileTypes: []
         },
         errors = [
-            "BrowserNotSupported", "TooManyFiles", "FileTooLarge", "FileTypeNotAllowed",
-            "NotFound", "NotReadable", "AbortError", "ReadError", "FileExtensionNotAllowed"
+            "BrowserNotSupported",
+	        "TooManyFiles",
+	        "FileTooLarge",
+	        "FileTypeNotAllowed",
+            "NotFound",
+	        "NotReadable",
+	        "AbortError",
+	        "ReadError",
+	        "FileExtensionNotAllowed",
+	        "XMLHttpRequestException"
         ];
 
-    // The actual plugin constructor
+	// region Exceptions
+	/**
+	 * XMLHttpRequest Exception
+	 * @param {String} message
+	 * @constructor
+	 */
+	function XMLHttpRequestException(message, xhr, file) {
+		this.message = message || 'XMLHttpRequestException';
+		this.name = 'XMLHttpRequestException';
+		this.xhr = xhr;
+		this.file = file;
+	}
+	XMLHttpRequestException.prototype = new Error();
+	XMLHttpRequestException.prototype.constructor = XMLHttpRequestException;
+
+	/**
+	 * Browser Not Supported Exception
+	 * @param {String} message
+	 * @constructor
+	 */
+	function BrowserNotSupportedException(message) {
+		this.message = message || 'Browser Not Supported';
+		this.name = 'BrowserNotSupportedException';
+	}
+	BrowserNotSupportedException.prototype = new Error();
+	BrowserNotSupportedException.prototype.constructor = BrowserNotSupportedException;
+
+	/**
+	 * Too Many Files Exception
+	 * @param {String} message
+	 * @constructor
+	 */
+	function TooManyFilesException(message) {
+		this.message = message || 'Too Many Files';
+		this.name = 'TooManyFilesException';
+	}
+	TooManyFilesException.prototype = new Error();
+	TooManyFilesException.prototype.constructor = TooManyFilesException;
+
+	/**
+	 * File Too Large Exception
+	 * @param {String} message
+	 * @constructor
+	 */
+	function FileTooLargeException(message) {
+		this.message = message || 'File Too Large';
+		this.name = 'FileTooLargeException';
+	}
+	FileTooLargeException.prototype = new Error();
+	FileTooLargeException.prototype.constructor = FileTooLargeException;
+
+	/**
+	 * File Type Not Allowed Exception
+	 * @param {String} message
+	 * @constructor
+	 */
+	function FileTypeNotAllowedException(message) {
+		this.message = message || 'File Type Not Allowed';
+		this.name = 'FileTypeNotAllowedException';
+	}
+	FileTypeNotAllowedException.prototype = new Error();
+	FileTypeNotAllowedException.prototype.constructor = FileTypeNotAllowedException;
+
+	/**
+	 * Not Found Exception
+	 * @param {String} message
+	 * @constructor
+	 */
+	function NotFoundException(message) {
+		this.message = message || 'Not Found';
+		this.name = 'NotFoundException';
+	}
+	NotFoundException.prototype = new Error();
+	NotFoundException.prototype.constructor = NotFoundException;
+
+	/**
+	 * Not Readable Exception
+	 * @param {String} message
+	 * @constructor
+	 */
+	function NotReadableException(message) {
+		this.message = message || 'Not Readable';
+		this.name = 'NotReadableException';
+	}
+	NotReadableException.prototype = new Error();
+	NotReadableException.prototype.constructor = NotReadableException;
+
+	/**
+	 * Abort Error Exception
+	 * @param {String} message
+	 * @constructor
+	 */
+	function AbortErrorException(message) {
+		this.message = message || 'Abort Error';
+		this.name = 'AbortErrorException';
+	}
+	AbortErrorException.prototype = new Error();
+	AbortErrorException.prototype.constructor = AbortErrorException;
+
+	/**
+	 * Read Error Exception
+	 * @param {String} message
+	 * @constructor
+	 */
+	function ReadErrorException(message) {
+		this.message = message || 'Read Error';
+		this.name = 'ReadErrorException';
+	}
+	ReadErrorException.prototype = new Error();
+	ReadErrorException.prototype.constructor = ReadErrorException;
+
+	/**
+	 * File Extension Not Allowed Exception
+	 * @param {String} message
+	 * @constructor
+	 */
+	function FileExtensionNotAllowedException(message) {
+		this.message = message || 'File Extension Not Allowed';
+		this.name = 'FileExtensionNotAllowedException';
+	}
+	FileExtensionNotAllowedException.prototype = new Error();
+	FileExtensionNotAllowedException.prototype.constructor = FileExtensionNotAllowedException;
+	// endregion
+
+	/**
+	 *
+	 * @param element
+	 * @param options
+	 * @constructor
+	 */
     function FileUpload(element, options) {
         this.element = element;
-        this.$element = $(element);
-        // jQuery has an extend method which merges the contents of two or
-        // more objects, storing the result in the first object. The first object
-        // is generally empty as we don't want to alter the default options for
-        // future instances of the plugin
         this.settings = $.extend({}, defaults, options);
         this._defaults = defaults;
         this._name = pluginName;
         this._inputFile = null;
         this._files = null;
-
         this.init();
 
         $this = this;
     }
 
     FileUpload.prototype = {
-        init: function () {
+	    init: function () {
             var $element = $(this.element);
 
             if (this.settings.inputFile !== null) {
@@ -85,18 +207,28 @@
                         this._inputFile = $(this.settings.inputFile);
                         break;
                 }
-
-                this._inputFile.hide().change(function (e) {
-                    $this.drop(e);
-                });
+            } else {
+	            var file = document.createElement('input');
+	            file.type = 'file';
+	            file.id = this.element.id + '-file';
+	            file.multiple = true;
+	            document.getElementsByTagName('body')[0].appendChild(file);
+	            this._inputFile = $(file);
             }
+
+	        this._inputFile.hide().change(function (e) {
+		        $this.drop(e);
+	        });
 
             $element
 	            .on('drop.fileUpload.element', this.drop)
 	            .on('dragstart.fileUpload.element', this.dragStart)
 	            .on('dragenter.fileUpload.element', this.dragEnter)
 	            .on('dragover.fileUpload.element', this.dragOver)
-	            .on('dragleave.fileUpload.element', this.dragLeave);
+	            .on('dragleave.fileUpload.element', this.dragLeave)
+	            .on('click.fileUpload.element', function (e) {
+		            $this._inputFile.trigger(e);
+	            });
 
             $(document)
 	            .on('drop.fileUpload.document', this.docDrop)
@@ -104,10 +236,6 @@
 	            .on('dragenter.fileUpload.document', this.docEnter)
 	            .on('dragover.fileUpload.document', this.docOver)
 	            .on('dragleave.fileUpload.document', this.docLeave);
-
-            this._inputFile !== null && $element.on('click', function (e) {
-                $this._inputFile.trigger(e);
-            });
         },
 
 		getFilesFromEvent: function(e) {
@@ -133,25 +261,24 @@
 
 	    /**
 	     * Return form data with the files
-	     * @param {int} startImage
+	     * @param {File} file
 	     * @returns {FormData}
 	     */
-        getFormData: function (startImage) {
-            var formData = new FormData(),
-	            settings = this.settings,
-	            files = this._files,
-	            file = null,
-	            i = startImage;
+        getFormData: function (file, index) {
+		    if (!file) {
+			    throw new ReadErrorException('Arquivo necessário para o FormData');
+		    }
 
-            startImage === undefined && (startImage = 0);
+            var formData = new FormData(),
+	            settings = this.settings;
 
             $.each(settings.data, function (name, value) {
                 formData.append(name, value);
             });
 
-	        $.each(files.slice(startImage, startImage + settings.maxFilesPerRequest), function(index, file) {
-		        formData.append(settings.paramName + '[]', file, file.name);
-	        });
+		    formData.append(settings.paramName, file, file.name);
+		    formData.file = file;
+		    formData.index = index;
 
             return formData;
         },
@@ -219,7 +346,7 @@
         upload: function() {
             var files = this._files,
                 settings = this.settings,
-                startImage = 0,
+                i = 0,
                 filesDone = 0,
 		        filesRejected = 0,
 		        workQueue = [],
@@ -231,123 +358,48 @@
 		        return false;
 	        }
 
-	        for (; startImage < files.length; startImage += settings.maxFilesPerRequest) {
-		        workQueue.push(this.getFormData(startImage));
+	        $.each(files, function(index, file) {
+		        workQueue.push($this.getFormData(file, index));
+	        });
+
+	        for (; i < files.length; i++) {
+		        workQueue.push(this.getFormData(files[i]));
 	        }
 
 	        var process = function() {
 		        try {
 			        send(workQueue);
 		        } catch (exc) {
-
+			        $this.error(exc);
 		        }
 	        };
-
-            // Process an upload, recursive
-            var oldprocess = function () {
-                var fileIndex;
-
-                if (stopLoop) {
-                    return false;
-                }
-
-                // Check to see if are in queue mode
-                if (settings.queuefiles > 0 && processingQueue.length >= settings.queuefiles) {
-                    return pause(settings.queuewait);
-                } else {
-                    // Take first thing off work queue
-                    fileIndex = workQueue[0];
-                    workQueue.splice(0, 1);
-
-                    // Add to processing queue
-                    processingQueue.push(fileIndex);
-                }
-
-                try {
-                    if (beforeEach(files[fileIndex]) !== false) {
-                        if (fileIndex === files_count) {
-                            return;
-                        }
-                        var reader = new FileReader(),
-                            max_file_size = 1048576 * settings.maxFileSize;
-
-                        reader.index = fileIndex;
-                        if (files[fileIndex].size > max_file_size) {
-                            settings.error(errors[2], files[fileIndex], fileIndex);
-                            // Remove from queue
-                            processingQueue.forEach(function (value, key) {
-                                if (value === fileIndex) {
-                                    processingQueue.splice(key, 1);
-                                }
-                            });
-                            filesRejected++;
-                            return true;
-                        }
-
-                        reader.onerror = function (e) {
-                            switch (e.target.error.code) {
-                                case e.target.error.NOT_FOUND_ERR:
-                                    settings.error(errors[4]);
-                                    return false;
-                                case e.target.error.NOT_READABLE_ERR:
-                                    settings.error(errors[5]);
-                                    return false;
-                                case e.target.error.ABORT_ERR:
-                                    settings.error(errors[6]);
-                                    return false;
-                                default:
-                                    settings.error(errors[7]);
-                                    return false;
-                            }
-                        };
-
-                        reader.onloadend = !settings.beforeSend ? send : function (e) {
-                            settings.beforeSend(files[fileIndex], fileIndex, function () {
-                                send(e);
-                            });
-                        };
-
-                        reader.readAsDataURL(files[fileIndex]);
-
-                    } else {
-                        filesRejected++;
-                    }
-                } catch (err) {
-                    // Remove from queue
-                    processingQueue.forEach(function (value, key) {
-                        if (value === fileIndex) {
-                            processingQueue.splice(key, 1);
-                        }
-                    });
-                    settings.error(errors[0]);
-                    return false;
-                }
-
-                // If we still have work to do,
-                if (workQueue.length > 0) {
-                    process();
-                }
-            };
 
             var send = function (workQueue) {
 	            var formData = workQueue.shift(),
 		            xhr = new XMLHttpRequest(),
 		            upload = xhr.upload,
-		            startTime = new Date().getTime();
+		            startTime = new Date().getTime(),
+		            index = null,
+		            file = null;
 
 	            if (!formData) {
 		            return false;
 	            }
 
+	            index = formData.index;
+	            file = formData.file;
+
                 if (settings.withCredentials) {
                     xhr.withCredentials = settings.withCredentials;
                 }
 
+	            upload.file = file;
+	            upload.index = index;
                 upload.downloadStartTime = startTime;
                 upload.currentStart = startTime;
                 upload.currentProgress = 0;
                 upload.startData = 0;
-                upload.addEventListener("progress", $this.progress, false);
+                upload.addEventListener('progress', $this.progress, false);
 
                 // Allow url to be a method
                 if ($.isFunction(settings.url)) {
@@ -359,68 +411,59 @@
                 xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
 
                 // Add headers
-                $.each(settings.headers, function (k, v) {
-                    xhr.setRequestHeader(k, v);
+                $.each(settings.headers, function (key, value) {
+                    xhr.setRequestHeader(key, value);
                 });
 
-                $this.uploadStarted();
+                $this.uploadStarted(index, file);
 
                 xhr.onload = function () {
                     var serverResponse = null;
 
                     if (xhr.responseText) {
                         try {
-                            serverResponse = $.parseJSON(xhr.responseText);
-                        }
-                        catch (e) {
+	                        serverResponse = JSON.parse(xhr.responseText);
+                        } catch (e) {
                             serverResponse = xhr.responseText;
                         }
                     }
 
                     var now = new Date().getTime(),
                         timeDiff = now - startTime,
-                        result = settings.uploadFinished(index, file, serverResponse, timeDiff, xhr);
+                        result = $this.uploadFinished(index, file, serverResponse, timeDiff, xhr);
                     filesDone++;
 
                     // Remove from processing queue
                     processingQueue.forEach(function (value, key) {
-                        if (value === fileIndex) {
+                        if (value === index) {
                             processingQueue.splice(key, 1);
                         }
                     });
 
                     // Add to donequeue
-                    doneQueue.push(fileIndex);
+                    doneQueue.push(file);
 
-                    // Make sure the global progress is updated
-                    global_progress[global_progress_index] = 100;
-                    globalProgress();
-
-                    if (filesDone === (files_count - filesRejected)) {
-                        afterAll();
+                    if (filesDone === (files.length - filesRejected)) {
+                        $this.afterAll();
                     }
 
                     if (result === false) {
                         stopLoop = true;
                     }
 
-
                     // Pass any errors to the error option
                     if (xhr.status < 200 || xhr.status > 299) {
-                        settings.error(xhr.statusText, file, fileIndex, xhr.status);
+	                    $this.error(new XMLHttpRequestException(xhr.statusText, xhr, file));
                     }
                 };
+
+	            return send(workQueue);
             };
 
             // Initiate the processing loop
             return process();
         },
 
-	    /**
-	     *
-	     * @param e
-	     * @returns {boolean}
-	     */
         drop: function(e) {
 	        e.originalEvent.stopPropagation();
 	        e.originalEvent.preventDefault();
@@ -493,32 +536,60 @@
             $this.settings.docLeave && $this.settings.docLeave(e);
         },
 
-        beforeEach: function() {
-            $this.settings.docLeave && $this.settings.docLeave(e);
+        beforeEach: function(index, file) {
+            $this.settings.beforeEach && $this.settings.beforeEach(index, file);
         },
 
-	    beforeSend: function(file, index, callback) {
-		    $this.settings.beforeSend && $this.settings.beforeSend(file, index, callback);
+	    /**
+	     *
+	     * @param {int} index
+	     * @param {File} file
+	     * @param {function} [callback]
+	     */
+	    beforeSend: function(index, file, callback) {
+		    $this.settings.beforeSend && $this.settings.beforeSend(index, file, callback);
 	    },
 
         afterAll: function() {
-            $this.settings.beforeEach && $this.settings.beforeEach(e);
+            $this.settings.afterAll && $this.settings.afterAll();
         },
 
-        rename: function() {
-            $this.settings.rename && $this.settings.rename(e);
+	    /**
+	     *
+	     * @param {String} name
+	     * @returns {String|null}
+	     */
+        rename: function(name) {
+	        if ($.isFunction($this.settings.rename)) {
+		        return $this.settings.rename(name);
+	        }
+
+	        return null;
         },
 
-        error: function(err, file, i, status) {
-            $this.settings.error && $this.settings.error(err, file, i, status);
+	    /**
+	     *
+	     * @param {Error} err
+	     */
+        error: function(err) {
+            $this.settings.error && $this.settings.error(err);
         },
 
-        uploadStarted: function() {
-            $this.settings.uploadStarted && $this.settings.uploadStarted(e);
+	    /**
+	     *
+	     * @param {int} index
+	     * @param {File} file
+	     */
+        uploadStarted: function(index, file) {
+            $this.settings.uploadStarted && $this.settings.uploadStarted(index, file);
         },
 
-        uploadFinished: function() {
-            $this.settings.uploadFinished && $this.settings.uploadFinished(e);
+        uploadFinished: function(index, file, serverResponse, timeDiff, xhr) {
+	        if ($.isFunction($this.settings.uploadFinished)) {
+		        return $this.settings.uploadFinished(index, file, serverResponse, timeDiff, xhr);
+	        }
+
+	        return true;
         },
 
         progressUpdated: function(index, file, currentProgress) {
@@ -560,10 +631,9 @@
 	/**
 	 *
 	 * @param {Object|String} options
-	 * @param {Object} [params]
 	 * @returns {jQuery}
 	 */
-    $.fn.fileUpload = function (options, params) {
+    $.fn.fileUpload = function (options) {
         this.each(function () {
             if (!$.data(this, 'plugin_' + pluginName)) {
                 if (typeof options !== 'object') {
@@ -574,8 +644,8 @@
             }
 
             if (typeof options === 'string') {
-                typeof $.data(this, 'plugin_' + pluginName).options === 'function'
-                    && $.data(this, 'plugin_' + pluginName).options(params);
+                $.isFunction($.data(this, 'plugin_' + pluginName).options)
+                    && $.data(this, 'plugin_' + pluginName).options();
             }
         });
 
