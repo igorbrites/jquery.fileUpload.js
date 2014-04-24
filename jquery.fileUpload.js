@@ -1,9 +1,7 @@
-// the semi-colon before function invocation is a safety net against concatenated
-// scripts and/or other plugins which may not be closed properly.
 ;
 (function ($, window, document, undefined) {
     'use strict';
-    $.event.props.push("dataTransfer");
+    jQuery.event.props.push("dataTransfer");
 
     var pluginName = "fileUpload",
         $this = null,
@@ -57,7 +55,10 @@
 	// region Exceptions
 	/**
 	 * XMLHttpRequest Exception
+	 * @augments Error
 	 * @param {String} message
+	 * @param {XMLHttpRequest} xhr
+	 * @param {File} file
 	 * @constructor
 	 */
 	function XMLHttpRequestException(message, xhr, file) {
@@ -71,6 +72,7 @@
 
 	/**
 	 * Browser Not Supported Exception
+	 * @augments Error
 	 * @param {String} message
 	 * @constructor
 	 */
@@ -83,6 +85,7 @@
 
 	/**
 	 * Too Many Files Exception
+	 * @augments Error
 	 * @param {String} message
 	 * @constructor
 	 */
@@ -95,6 +98,7 @@
 
 	/**
 	 * File Too Large Exception
+	 * @augments Error
 	 * @param {String} message
 	 * @constructor
 	 */
@@ -107,18 +111,22 @@
 
 	/**
 	 * File Type Not Allowed Exception
+	 * @augments Error
 	 * @param {String} message
+	 * @param {File} file
 	 * @constructor
 	 */
-	function FileTypeNotAllowedException(message) {
+	function FileTypeNotAllowedException(message, file) {
 		this.message = message || 'File Type Not Allowed';
 		this.name = 'FileTypeNotAllowedException';
+		this.file = file;
 	}
 	FileTypeNotAllowedException.prototype = new Error();
 	FileTypeNotAllowedException.prototype.constructor = FileTypeNotAllowedException;
 
 	/**
 	 * Not Found Exception
+	 * @augments Error
 	 * @param {String} message
 	 * @constructor
 	 */
@@ -131,6 +139,7 @@
 
 	/**
 	 * Not Readable Exception
+	 * @augments Error
 	 * @param {String} message
 	 * @constructor
 	 */
@@ -143,6 +152,7 @@
 
 	/**
 	 * Abort Error Exception
+	 * @augments Error
 	 * @param {String} message
 	 * @constructor
 	 */
@@ -155,6 +165,7 @@
 
 	/**
 	 * Read Error Exception
+	 * @augments Error
 	 * @param {String} message
 	 * @constructor
 	 */
@@ -167,12 +178,15 @@
 
 	/**
 	 * File Extension Not Allowed Exception
+	 * @augments Error
 	 * @param {String} message
+	 * @param {File} file
 	 * @constructor
 	 */
-	function FileExtensionNotAllowedException(message) {
+	function FileExtensionNotAllowedException(message, file) {
 		this.message = message || 'File Extension Not Allowed';
 		this.name = 'FileExtensionNotAllowedException';
+		this.file = file;
 	}
 	FileExtensionNotAllowedException.prototype = new Error();
 	FileExtensionNotAllowedException.prototype.constructor = FileExtensionNotAllowedException;
@@ -242,19 +256,21 @@
 			var files = e.dataTransfer.files;
 
 			if (files === null || files === undefined || files.length === 0) {
-				$this.error(errors[0]);
+				$this.error(new BrowserNotSupportedException());
 				return false;
 			}
 
 			if (files.length > $this.settings.maxFiles) {
-				$this.error(errors[1]);
+				$this.error(new TooManyFilesException());
 				return false;
 			}
 
-			$this._files = [];
+			this._files = [];
 			for (var i = 0; i < files.length; i++) {
-				$this._files.push(files.item(i));
+				this._files.push(files.item(i));
 			}
+
+			this.validateFiles();
 
 			return true;
 		},
@@ -262,6 +278,7 @@
 	    /**
 	     * Return form data with the files
 	     * @param {File} file
+	     * @param {int} index
 	     * @returns {FormData}
 	     */
         getFormData: function (file, index) {
@@ -293,12 +310,14 @@
 			    filtered = null;
 
 		    if (!files) {
-			    this.error(errors[0]);
+			    this.error(new BrowserNotSupportedException());
+			    this._files = [];
 			    return false;
 		    }
 
 		    if (files.length > settings.maxFiles) {
-			    this.error(errors[1]);
+			    this.error(new TooManyFilesException());
+			    this._files = [];
 			    return false;
 		    }
 
@@ -312,9 +331,11 @@
 					    }
 				    }
 
-				    $this.error(errors[3], file);
+				    $this.error(new FileTypeNotAllowedException(null, file));
 				    return false;
 			    }, true);
+
+			    this._files = filtered;
 
 			    if (filtered.length === 0) {
 				    return false;
@@ -331,9 +352,11 @@
 					    }
 				    }
 
-				    $this.error(errors[8], file);
+				    $this.error(new FileExtensionNotAllowedException(null, file));
 				    return false;
 			    }, true);
+
+			    this._files = filtered;
 
 			    if (filtered.length === 0) {
 				    return false;
