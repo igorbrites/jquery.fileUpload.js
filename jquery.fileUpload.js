@@ -39,19 +39,7 @@
             allowedFileExtensions: [],
             allowedFileTypes: [],
 	        headers: []
-        },
-        errors = [
-            "BrowserNotSupported",
-	        "TooManyFiles",
-	        "FileTooLarge",
-	        "FileTypeNotAllowed",
-            "NotFound",
-	        "NotReadable",
-	        "AbortError",
-	        "ReadError",
-	        "FileExtensionNotAllowed",
-	        "XMLHttpRequestException"
-        ];
+        };
 
 	/**
 	 *
@@ -114,7 +102,9 @@
         },
 
 		getFilesFromEvent: function(e) {
-			var files = e.dataTransfer.files;
+			var files = e.dataTransfer.files,
+				file = null,
+				i = 0;
 
 			if (files === null || files === undefined || files.length === 0) {
 				throw new BrowserNotSupportedException();
@@ -125,8 +115,10 @@
 			}
 
 			this._files = [];
-			for (var i = 0; i < files.length; i++) {
-				this._files.push(files.item(i));
+			for (; i < files.length; i++) {
+				file = files.item(i);
+				file.index = i;
+				this._files.push(file);
 			}
 
 			return this.validateFiles();
@@ -134,12 +126,11 @@
 
 	    /**
 	     * Return form data with the files
-	     * @param {File} file
-	     * @param {int} index
+	     * @param {File[]} files
 	     * @returns {FormData}
 	     */
-        getFormData: function (file, index) {
-		    if (!file) {
+        getFormData: function (files) {
+		    if (!files) {
 			    throw new ReadErrorException('Arquivo necessário para o FormData');
 		    }
 
@@ -150,9 +141,12 @@
                 formData.append(name, value);
             });
 
-		    formData.append(settings.paramName, file, file.name);
-		    formData.file = file;
-		    formData.index = index;
+		    for (var i in files) {
+			    var file = files[i];
+			    formData.append(settings.paramName + '[' + file.index + ']', file, file.name);
+		    }
+
+		    formData.files = files;
 
             return formData;
         },
@@ -237,13 +231,13 @@
 		        return false;
 	        }
 
-	        $.each(files, function(index, file) {
-		        workQueue.push($this.getFormData(file, index));
-	        });
+	        for (var i = 0; i < files.length; i += settings.maxFilesPerRequest) {
+		        workQueue.push($this.getFormData(files.slice(i, i + settings.maxFilesPerRequest)));
+	        }
 
 	        var process = function(thisObj) {
 		        try {
-			        send(workQueue);
+			        send();
 		        } catch (exc) {
 			        thisObj.error(exc);
 		        }
@@ -253,23 +247,20 @@
 	            var formData = workQueue.shift(),
 		            xhr = new XMLHttpRequest(),
 		            upload = xhr.upload,
-		            startTime = new Date().getTime(),
-		            index = null,
-		            file = null;
+		            startTime = (new Date()).getTime(),
+		            files = null;
 
 	            if (!formData) {
 		            return false;
 	            }
 
-	            index = formData.index;
-	            file = formData.file;
+	            files = formData.files;
 
                 if (settings.withCredentials) {
                     xhr.withCredentials = settings.withCredentials;
                 }
 
-	            upload.file = file;
-	            upload.index = index;
+	            upload.files = files;
                 upload.downloadStartTime = startTime;
                 upload.currentStart = startTime;
                 upload.currentProgress = 0;
@@ -290,7 +281,9 @@
                     xhr.setRequestHeader(key, value);
                 });
 
-                $this.uploadStarted(index, file);
+	            files.map(function(file) {
+		            this.uploadStarted(file);
+	            }, $this);
 
                 xhr.onload = function () {
                     var serverResponse = null;
@@ -304,37 +297,29 @@
                     }
 
                     var now = new Date().getTime(),
-                        timeDiff = now - startTime,
-                        result = $this.uploadFinished(index, file, serverResponse, timeDiff, xhr);
+                        timeDiff = now - startTime;
+
+	                files.map(function(file) {
+		                this.uploadFinished(file, serverResponse, timeDiff, xhr) || (stopLoop = true);
+	                }, $this);
+
                     filesDone++;
 
-                    // Remove from processing queue
-                    processingQueue.forEach(function (value, key) {
-                        if (value === index) {
-                            processingQueue.splice(key, 1);
-                        }
-                    });
-
-                    // Add to donequeue
-                    doneQueue.push(file);
-
-                    if (filesDone === (files.length - filesRejected)) {
+                    if (filesDone === $this._files.length) {
                         $this.afterAll();
-                    }
-
-                    if (result === false) {
-                        stopLoop = true;
                     }
 
                     // Pass any errors to the error option
                     if (xhr.status < 200 || xhr.status > 299) {
-	                    $this.error(new XMLHttpRequestException(xhr.statusText, xhr, file));
+	                    files.map(function(file) {
+		                    this.error(new XMLHttpRequestException(xhr.statusText, xhr, file));
+	                    }, $this);
                     }
                 };
 
 	            xhr.send(formData);
 
-	            return send(workQueue);
+	            return send();
             };
 
             // Initiate the processing loop
@@ -357,7 +342,7 @@
 		        }
 
 		        $.each($this._files, function(index, file) {
-			        $this.beforeEach(index, file);
+			        $this.beforeEach(file);
 		        });
 
 		        $this.settings.lazyLoad || $this.upload();
@@ -422,18 +407,17 @@
             $this.settings.docLeave && $this.settings.docLeave(e);
         },
 
-        beforeEach: function(index, file) {
-            $this.settings.beforeEach && $this.settings.beforeEach(index, file);
+        beforeEach: function(file) {
+            $this.settings.beforeEach && $this.settings.beforeEach(file);
         },
 
 	    /**
 	     *
-	     * @param {int} index
 	     * @param {File} file
 	     * @param {function} [callback]
 	     */
-	    beforeSend: function(index, file, callback) {
-		    $this.settings.beforeSend && $this.settings.beforeSend(index, file, callback);
+	    beforeSend: function(file, callback) {
+		    $this.settings.beforeSend && $this.settings.beforeSend(file, callback);
 	    },
 
         afterAll: function() {
@@ -463,33 +447,31 @@
 
 	    /**
 	     *
-	     * @param {int} index
 	     * @param {File} file
 	     */
-        uploadStarted: function(index, file) {
-            $this.settings.uploadStarted && $this.settings.uploadStarted(index, file);
+        uploadStarted: function(file) {
+            $this.settings.uploadStarted && $this.settings.uploadStarted(file);
         },
 
-        uploadFinished: function(index, file, serverResponse, timeDiff, xhr) {
+        uploadFinished: function(file, serverResponse, timeDiff, xhr) {
 	        if ($.isFunction($this.settings.uploadFinished)) {
-		        return $this.settings.uploadFinished(index, file, serverResponse, timeDiff, xhr);
+		        return $this.settings.uploadFinished(file, serverResponse, timeDiff, xhr);
 	        }
 
 	        return true;
         },
 
-        progressUpdated: function(index, file, currentProgress) {
-            $this.settings.progressUpdated && $this.settings.progressUpdated(index, file, currentProgress);
+        progressUpdated: function(file, currentProgress) {
+            $this.settings.progressUpdated && $this.settings.progressUpdated(file, currentProgress);
         },
 
 	    /**
 	     *
-	     * @param {int} index
 	     * @param {File} file
 	     * @param {float} speed
 	     */
-        speedUpdated: function(index, file, speed) {
-            $this.settings.speedUpdated && $this.settings.speedUpdated(index, file, speed);
+        speedUpdated: function(file, speed) {
+            $this.settings.speedUpdated && $this.settings.speedUpdated(file, speed);
         },
 
 	    /**
@@ -501,6 +483,7 @@
             // $this = FileUpload
             if (e.lengthComputable) {
                 var percentage = Math.round((e.loaded * 100) / e.total),
+	                files = this.files,
                     elapsed = null,
                     diffTime = null,
                     diffData = null,
@@ -508,16 +491,22 @@
 
                 if (this.currentProgress !== percentage) {
                     this.currentProgress = percentage;
-                    $this.progressUpdated(this.index, this.file, this.currentProgress);
+
+	                files.map(function(file) {
+		                this.progressUpdated(file, percentage);
+	                }, $this);
 
                     elapsed = (new Date()).getTime();
                     diffTime = elapsed - this.currentStart;
                     if (diffTime >= $this.settings.refresh) {
                         diffData = e.loaded - this.startData;
                         speed = diffData / diffTime; // KB per second
-                        $this.speedUpdated(this.index, this.file, speed);
                         this.startData = e.loaded;
                         this.currentStart = elapsed;
+
+	                    files.map(function(file) {
+		                    this.speedUpdated(file, speed);
+	                    }, $this);
                     }
                 }
             }
@@ -556,10 +545,11 @@
 	// region Exceptions
 	/**
 	 * XMLHttpRequest Exception
+	 * @class
 	 * @augments Error
-	 * @param {String} message
-	 * @param {XMLHttpRequest} xhr
-	 * @param {File} file
+	 * @param {String} [message]
+	 * @param {XMLHttpRequest} [xhr]
+	 * @param {File} [file]
 	 * @constructor
 	 */
 	function XMLHttpRequestException(message, xhr, file) {
@@ -573,8 +563,9 @@
 
 	/**
 	 * Browser Not Supported Exception
+	 * @class
 	 * @augments Error
-	 * @param {String} message
+	 * @param {String} [message]
 	 * @constructor
 	 */
 	function BrowserNotSupportedException(message) {
@@ -586,8 +577,9 @@
 
 	/**
 	 * Too Many Files Exception
+	 * @class
 	 * @augments Error
-	 * @param {String} message
+	 * @param {String} [message]
 	 * @constructor
 	 */
 	function TooManyFilesException(message) {
@@ -599,8 +591,9 @@
 
 	/**
 	 * File Too Large Exception
+	 * @class
 	 * @augments Error
-	 * @param {String} message
+	 * @param {String} [message]
 	 * @constructor
 	 */
 	function FileTooLargeException(message) {
@@ -612,9 +605,10 @@
 
 	/**
 	 * File Type Not Allowed Exception
+	 * @class
 	 * @augments Error
-	 * @param {String} message
-	 * @param {File} file
+	 * @param {String} [message]
+	 * @param {File} [file]
 	 * @constructor
 	 */
 	function FileTypeNotAllowedException(message, file) {
@@ -627,8 +621,9 @@
 
 	/**
 	 * Not Found Exception
+	 * @class
 	 * @augments Error
-	 * @param {String} message
+	 * @param {String} [message]
 	 * @constructor
 	 */
 	function NotFoundException(message) {
@@ -640,8 +635,9 @@
 
 	/**
 	 * Not Readable Exception
+	 * @class
 	 * @augments Error
-	 * @param {String} message
+	 * @param {String} [message]
 	 * @constructor
 	 */
 	function NotReadableException(message) {
@@ -653,8 +649,9 @@
 
 	/**
 	 * Abort Error Exception
+	 * @class
 	 * @augments Error
-	 * @param {String} message
+	 * @param {String} [message]
 	 * @constructor
 	 */
 	function AbortErrorException(message) {
@@ -666,8 +663,9 @@
 
 	/**
 	 * Read Error Exception
+	 * @class
 	 * @augments Error
-	 * @param {String} message
+	 * @param {String} [message]
 	 * @constructor
 	 */
 	function ReadErrorException(message) {
@@ -679,9 +677,10 @@
 
 	/**
 	 * File Extension Not Allowed Exception
+	 * @class
 	 * @augments Error
-	 * @param {String} message
-	 * @param {File} file
+	 * @param {String} [message]
+	 * @param {File} [file]
 	 * @constructor
 	 */
 	function FileExtensionNotAllowedException(message, file) {
