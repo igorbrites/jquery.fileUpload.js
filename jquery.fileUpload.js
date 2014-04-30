@@ -1,5 +1,12 @@
-;
-(function ($, window, document, undefined) {
+/**
+ * @overview jQuery plugin for html5 dragging files from desktop to browser and upload them to server via XMLHttpRequest2
+ * @copyright (c) 2014 Igor Brites
+ * @author Igor Brites [https://github.com/igorbrites]
+ * @license http://opensource.org/licenses/MIT
+ * @see https://github.com/igorbrites/jquery.fileUpload.js
+ * @version  0.1
+ */
+;(function ($, window, document, undefined) {
 	'use strict';
 	jQuery.event.props.push("dataTransfer");
 
