@@ -1,12 +1,5 @@
-/**
- * @overview jQuery plugin for html5 dragging files from desktop to browser and upload them to server via XMLHttpRequest2
- * @copyright (c) 2014 Igor Brites
- * @author Igor Brites [https://github.com/igorbrites]
- * @license http://opensource.org/licenses/MIT
- * @see https://github.com/igorbrites/jquery.fileUpload.js
- * @version  0.1
- */
-;(function ($, window, document, undefined) {
+;
+(function ($, window, document, undefined) {
 	'use strict';
 	jQuery.event.props.push("dataTransfer");
 
@@ -78,7 +71,6 @@
 				var file = document.createElement('input');
 				file.type = 'file';
 				file.id = this.element.id + '-file';
-				file.name = this.element.id + '-file';
 				file.multiple = true;
 				document.getElementsByTagName('form')[0].appendChild(file);
 				this._inputFile = $(file);
@@ -106,7 +98,7 @@
 				.on('dragleave.fileUpload.document', this.docLeave);
 		},
 
-		getFilesFromEvent: function (e) {
+		getFilesFromEvent: function(e) {
 			var files = e.dataTransfer.files,
 				file = null,
 				i = 0;
@@ -162,7 +154,7 @@
 		 * Validate the files
 		 * @returns {boolean}
 		 */
-		validateFiles: function () {
+		validateFiles: function() {
 			var files = this._files,
 				settings = this.settings,
 				filtered = null;
@@ -180,7 +172,7 @@
 			}
 
 			if (typeof settings.allowedFileTypes === 'object' && settings.allowedFileTypes.length > 0) {
-				filtered = $.grep(files, function (file) {
+				filtered = $.grep(files, function(file) {
 					if (file.type) {
 						for (var i in settings.allowedFileTypes) {
 							if ((new RegExp(settings.allowedFileTypes[i])).test(file.type)) {
@@ -201,7 +193,7 @@
 			}
 
 			if (typeof settings.allowedFileExtensions === 'object' && settings.allowedFileExtensions.length > 0) {
-				filtered = $.grep(files, function (file) {
+				filtered = $.grep(files, function(file) {
 					if (file.name) {
 						for (var i in settings.allowedFileExtensions) {
 							if (file.name.substr(file.name.length - settings.allowedFileExtensions[i].length).toLowerCase() === settings.allowedFileExtensions[i].toLowerCase()) {
@@ -224,7 +216,7 @@
 			return true;
 		},
 
-		upload: function () {
+		upload: function() {
 			var files = this._files,
 				settings = this.settings,
 				filesDone = 0,
@@ -242,7 +234,7 @@
 				workQueue.push($this.getFormData(files.slice(i, i + settings.maxFilesPerRequest)));
 			}
 
-			var process = function (thisObj) {
+			var process = function(thisObj) {
 				try {
 					send();
 				} catch (exc) {
@@ -288,7 +280,7 @@
 					xhr.setRequestHeader(key, value);
 				});
 
-				files.map(function (file) {
+				files.map(function(file) {
 					this.uploadStarted(file);
 				}, $this);
 
@@ -306,7 +298,7 @@
 					var now = new Date().getTime(),
 						timeDiff = now - startTime;
 
-					files.map(function (file) {
+					files.map(function(file) {
 						this.uploadFinished(file, serverResponse, timeDiff, xhr) || (stopLoop = true);
 					}, $this);
 
@@ -318,7 +310,7 @@
 
 					// Pass any errors to the error option
 					if (xhr.status < 200 || xhr.status > 299) {
-						files.map(function (file) {
+						files.map(function(file) {
 							this.error(new XMLHttpRequestException(xhr.statusText, xhr, file));
 						}, $this);
 					}
@@ -333,7 +325,7 @@
 			return process(this);
 		},
 
-		drop: function (e) {
+		drop: function(e) {
 			e.originalEvent.stopPropagation();
 			e.originalEvent.preventDefault();
 
@@ -348,7 +340,7 @@
 					throw new NotFoundException();
 				}
 
-				$.each($this._files, function (index, file) {
+				$.each($this._files, function(index, file) {
 					$this.beforeEach(file);
 				});
 
@@ -360,61 +352,61 @@
 			}
 		},
 
-		dragStart: function (e) {
+		dragStart: function(e) {
 			e.originalEvent.stopPropagation();
 			e.originalEvent.preventDefault();
 			$this.settings.dragStart && $this.settings.dragStart(e);
 		},
 
-		dragEnter: function (e) {
+		dragEnter: function(e) {
 			e.originalEvent.stopPropagation();
 			e.originalEvent.preventDefault();
 			$this.settings.dragEnter && $this.settings.dragEnter(e);
 		},
 
-		dragOver: function (e) {
+		dragOver: function(e) {
 			e.originalEvent.stopPropagation();
 			e.originalEvent.preventDefault();
 			$this.settings.dragOver && $this.settings.dragOver(e);
 		},
 
-		dragLeave: function (e) {
+		dragLeave: function(e) {
 			e.originalEvent.stopPropagation();
 			e.originalEvent.preventDefault();
 			$this.settings.dragLeave && $this.settings.dragLeave(e);
 		},
 
-		docDrop: function (e) {
+		docDrop: function(e) {
 			e.originalEvent.stopPropagation();
 			e.originalEvent.preventDefault();
 			$this.settings.docDrop && $this.settings.docDrop(e);
 		},
 
-		docStart: function (e) {
+		docStart: function(e) {
 			e.originalEvent.stopPropagation();
 			e.originalEvent.preventDefault();
 			$this.settings.docStart && $this.settings.docStart(e);
 		},
 
-		docEnter: function (e) {
+		docEnter: function(e) {
 			e.originalEvent.stopPropagation();
 			e.originalEvent.preventDefault();
 			$this.settings.docEnter && $this.settings.docEnter(e);
 		},
 
-		docOver: function (e) {
+		docOver: function(e) {
 			e.originalEvent.stopPropagation();
 			e.originalEvent.preventDefault();
 			$this.settings.docOver && $this.settings.docOver(e);
 		},
 
-		docLeave: function (e) {
+		docLeave: function(e) {
 			e.originalEvent.stopPropagation();
 			e.originalEvent.preventDefault();
 			$this.settings.docLeave && $this.settings.docLeave(e);
 		},
 
-		beforeEach: function (file) {
+		beforeEach: function(file) {
 			$this.settings.beforeEach && $this.settings.beforeEach(file);
 		},
 
@@ -423,11 +415,11 @@
 		 * @param {File} file
 		 * @param {function} [callback]
 		 */
-		beforeSend: function (file, callback) {
+		beforeSend: function(file, callback) {
 			$this.settings.beforeSend && $this.settings.beforeSend(file, callback);
 		},
 
-		afterAll: function () {
+		afterAll: function() {
 			$this.settings.afterAll && $this.settings.afterAll();
 		},
 
@@ -436,7 +428,7 @@
 		 * @param {String} name
 		 * @returns {String|null}
 		 */
-		rename: function (name) {
+		rename: function(name) {
 			if ($.isFunction($this.settings.rename)) {
 				return $this.settings.rename(name);
 			}
@@ -448,7 +440,7 @@
 		 *
 		 * @param {Error} err
 		 */
-		error: function (err) {
+		error: function(err) {
 			$this.settings.error && $this.settings.error(err);
 		},
 
@@ -456,11 +448,11 @@
 		 *
 		 * @param {File} file
 		 */
-		uploadStarted: function (file) {
+		uploadStarted: function(file) {
 			$this.settings.uploadStarted && $this.settings.uploadStarted(file);
 		},
 
-		uploadFinished: function (file, serverResponse, timeDiff, xhr) {
+		uploadFinished: function(file, serverResponse, timeDiff, xhr) {
 			if ($.isFunction($this.settings.uploadFinished)) {
 				return $this.settings.uploadFinished(file, serverResponse, timeDiff, xhr);
 			}
@@ -468,7 +460,7 @@
 			return true;
 		},
 
-		progressUpdated: function (file, currentProgress) {
+		progressUpdated: function(file, currentProgress) {
 			$this.settings.progressUpdated && $this.settings.progressUpdated(file, currentProgress);
 		},
 
@@ -477,7 +469,7 @@
 		 * @param {File} file
 		 * @param {float} speed
 		 */
-		speedUpdated: function (file, speed) {
+		speedUpdated: function(file, speed) {
 			$this.settings.speedUpdated && $this.settings.speedUpdated(file, speed);
 		},
 
@@ -486,7 +478,7 @@
 		 * @this XMLHttpRequestUpload
 		 * @param {event} e
 		 */
-		progress: function (e) {
+		progress: function(e) {
 			// $this = FileUpload
 			if (e.lengthComputable) {
 				var percentage = Math.round((e.loaded * 100) / e.total),
@@ -499,7 +491,7 @@
 				if (this.currentProgress !== percentage) {
 					this.currentProgress = percentage;
 
-					files.map(function (file) {
+					files.map(function(file) {
 						this.progressUpdated(file, percentage);
 					}, $this);
 
@@ -511,7 +503,7 @@
 						this.startData = e.loaded;
 						this.currentStart = elapsed;
 
-						files.map(function (file) {
+						files.map(function(file) {
 							this.speedUpdated(file, speed);
 						}, $this);
 					}
@@ -565,7 +557,6 @@
 		this.xhr = xhr;
 		this.file = file;
 	}
-
 	XMLHttpRequestException.prototype = new Error();
 	XMLHttpRequestException.prototype.constructor = XMLHttpRequestException;
 
@@ -580,7 +571,6 @@
 		this.message = message || 'Browser Not Supported';
 		this.name = 'BrowserNotSupportedException';
 	}
-
 	BrowserNotSupportedException.prototype = new Error();
 	BrowserNotSupportedException.prototype.constructor = BrowserNotSupportedException;
 
@@ -595,7 +585,6 @@
 		this.message = message || 'Too Many Files';
 		this.name = 'TooManyFilesException';
 	}
-
 	TooManyFilesException.prototype = new Error();
 	TooManyFilesException.prototype.constructor = TooManyFilesException;
 
@@ -610,7 +599,6 @@
 		this.message = message || 'File Too Large';
 		this.name = 'FileTooLargeException';
 	}
-
 	FileTooLargeException.prototype = new Error();
 	FileTooLargeException.prototype.constructor = FileTooLargeException;
 
@@ -627,7 +615,6 @@
 		this.name = 'FileTypeNotAllowedException';
 		this.file = file;
 	}
-
 	FileTypeNotAllowedException.prototype = new Error();
 	FileTypeNotAllowedException.prototype.constructor = FileTypeNotAllowedException;
 
@@ -642,7 +629,6 @@
 		this.message = message || 'Not Found';
 		this.name = 'NotFoundException';
 	}
-
 	NotFoundException.prototype = new Error();
 	NotFoundException.prototype.constructor = NotFoundException;
 
@@ -657,7 +643,6 @@
 		this.message = message || 'Not Readable';
 		this.name = 'NotReadableException';
 	}
-
 	NotReadableException.prototype = new Error();
 	NotReadableException.prototype.constructor = NotReadableException;
 
@@ -672,7 +657,6 @@
 		this.message = message || 'Abort Error';
 		this.name = 'AbortErrorException';
 	}
-
 	AbortErrorException.prototype = new Error();
 	AbortErrorException.prototype.constructor = AbortErrorException;
 
@@ -687,7 +671,6 @@
 		this.message = message || 'Read Error';
 		this.name = 'ReadErrorException';
 	}
-
 	ReadErrorException.prototype = new Error();
 	ReadErrorException.prototype.constructor = ReadErrorException;
 
@@ -704,7 +687,6 @@
 		this.name = 'FileExtensionNotAllowedException';
 		this.file = file;
 	}
-
 	FileExtensionNotAllowedException.prototype = new Error();
 	FileExtensionNotAllowedException.prototype.constructor = FileExtensionNotAllowedException;
 	// endregion
