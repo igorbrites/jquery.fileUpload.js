@@ -77,6 +77,7 @@
 			}
 
 			this._inputFile.hide().change(function (e) {
+				e.dataTransfer = {files: e.target.files};
 				$this.drop(e);
 			});
 
@@ -103,7 +104,7 @@
 				file = null,
 				i = 0;
 
-			this._inputFile.trigger(e);
+			e.target.id !== this._inputFile[0].id && this._inputFile.trigger(e);
 
 			if (files === null || files === undefined || files.length === 0) {
 				throw new BrowserNotSupportedException();
