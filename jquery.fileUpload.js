@@ -99,9 +99,7 @@
 		},
 
 		getFilesFromEvent: function(e) {
-			var files = e.dataTransfer.files,
-				file = null,
-				i = 0;
+			var files = e.dataTransfer.files;
 
 			e.target.id !== this._inputFile[0].id && this._inputFile.trigger(e);
 
@@ -113,13 +111,7 @@
 				throw new TooManyFilesException();
 			}
 
-			for (; i < files.length; i++) {
-				file = files.item(i);
-				file.index = i;
-				this._files.push(file);
-			}
-
-			return this.validateFiles();
+			return this.validateFiles(files);
 		},
 
 		/**
@@ -151,12 +143,18 @@
 
 		/**
 		 * Validate the files
+		 * @param {FileList} fileList
 		 * @returns {boolean}
 		 */
-		validateFiles: function() {
-			var files = this._files,
+		validateFiles: function(fileList) {
+			var files = [],
 				settings = this.settings,
-				filtered = null;
+				filtered = null,
+				i = 0;
+
+			for (; i < fileList.length; i++) {
+				files.push(fileList.item(i));
+			}
 
 			if (files.length === 0) {
 				this.error(new BrowserNotSupportedException());
@@ -212,7 +210,10 @@
 				}
 			}
 
-			this._files = files;
+			for (i = 0; i < files.length; i++) {
+				this._files.push(files[i]);
+				this.beforeEach(files[i]);
+			}
 
 			return true;
 		},
@@ -226,10 +227,6 @@
 				processingQueue = [],
 				doneQueue = [],
 				stopLoop = false;
-
-			if (!this.validateFiles()) {
-				return false;
-			}
 
 			for (var i = 0; i < files.length; i += settings.maxFilesPerRequest) {
 				workQueue.push($this.getFormData(files.slice(i, i + settings.maxFilesPerRequest)));
@@ -274,7 +271,7 @@
 					xhr.open(settings.requestType, settings.url, true);
 				}
 
-				xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+				xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 
 				// Add headers
 				$.each(settings.headers, function (key, value) {
@@ -342,10 +339,6 @@
 				if (!$this.getFilesFromEvent(e)) {
 					throw new NotFoundException();
 				}
-
-				$.each($this._files, function(index, file) {
-					$this.beforeEach(file);
-				});
 
 				$this.settings.lazyLoad || $this.upload();
 				return true;
