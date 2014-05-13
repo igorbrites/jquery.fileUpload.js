@@ -5,7 +5,6 @@
 
 	var pluginName = "fileUpload",
 		$this = null,
-		global_progress = [],
 		defaults = {
 			url: '',
 			data: {},
@@ -53,7 +52,7 @@
 		this._defaults = defaults;
 		this._name = pluginName;
 		this._inputFile = null;
-		this._files = null;
+		this._files = [];
 		this.init();
 
 		$this = this;
@@ -114,7 +113,6 @@
 				throw new TooManyFilesException();
 			}
 
-			this._files = [];
 			for (; i < files.length; i++) {
 				file = files.item(i);
 				file.index = i;
@@ -160,7 +158,7 @@
 				settings = this.settings,
 				filtered = null;
 
-			if (!files) {
+			if (files.length === 0) {
 				this.error(new BrowserNotSupportedException());
 				this._files = [];
 				return false;
@@ -186,7 +184,7 @@
 					return true;
 				}, true);
 
-				this._files = filtered;
+				files = filtered;
 
 				if (filtered.length === 0) {
 					return false;
@@ -207,12 +205,14 @@
 					return true;
 				}, true);
 
-				this._files = filtered;
+				files = filtered;
 
 				if (filtered.length === 0) {
 					return false;
 				}
 			}
+
+			this._files = files;
 
 			return true;
 		},
@@ -307,6 +307,8 @@
 
 					if (filesDone === $this._files.length) {
 						$this.afterAll();
+						$this._inputFile.val('');
+						$this._files = [];
 					}
 
 					// Pass any errors to the error option
